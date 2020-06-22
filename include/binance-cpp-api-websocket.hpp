@@ -51,6 +51,7 @@ namespace binance_api {
         using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
         using json = nlohmann::json;
         std::string point = "stream.binancefuture.com/stream";
+        //std::string point = "stream.binance.com:9443/stream";
         std::string sert_file = "curl-ca-bundle.crt";
 
         std::shared_ptr<WssClient::Connection> save_connection;
@@ -254,6 +255,14 @@ namespace binance_api {
             return temp;
         }
 
+        std::string to_lower_case(const std::string &s){
+            std::string temp = s;
+            std::transform(temp.begin(), temp.end(), temp.begin(), [](char ch) {
+                return std::use_facet<std::ctype<char>>(std::locale()).tolower(ch);
+            });
+            return temp;
+        }
+
     public:
         std::function<void(
             const std::string &symbol,
@@ -270,6 +279,24 @@ namespace binance_api {
                 const std::string user_sert_file = "curl-ca-bundle.crt") {
             /* инициализируем переменные */
             point = user_point;
+            sert_file = user_sert_file;
+            offset_timestamp = 0;
+            is_websocket_init = false;
+            is_close_connection = false;
+            is_error = false;
+            is_open = false;
+        }
+
+        /** \brief Конструктор класс для получения потока котировок
+         * \param user_point Конечная точка подключения
+         * \param user_sert_file Файл-сертификат. По умолчанию используется от curl: curl-ca-bundle.crt
+         */
+        CandlestickStreams(
+                const bool is_demo,
+                const std::string user_sert_file = "curl-ca-bundle.crt") {
+            /* инициализируем переменные */
+            if(is_demo) point = "stream.binancefuture.com/stream";
+            else point = "stream.binance.com:9443/stream";
             sert_file = user_sert_file;
             offset_timestamp = 0;
             is_websocket_init = false;
@@ -521,16 +548,17 @@ namespace binance_api {
                 const uint32_t period) {
             auto it = index_interval_to_str.find(period);
             if(it == index_interval_to_str.end()) return;
+            std::string s = to_lower_case(symbol);
             json j;
             j["method"] = "SUBSCRIBE";
             j["params"] = json::array();
-            std::string param = symbol + "@kline_" + it->second;
+            std::string param = s + "@kline_" + it->second;
             j["params"][0] = param;
             j["id"] = 1;
             {
                 std::lock_guard<std::mutex> lock(list_subscriptions_mutex);
                 /* имя символа ОБЯЗАТЕЛЬНО В НИЖНЕМ РЕГИСТРЕ! */
-                list_subscriptions[symbol][period] = true;
+                list_subscriptions[s][period] = true;
             }
             if(!is_open) return;
             send(j.dump());
@@ -545,16 +573,17 @@ namespace binance_api {
                 const uint32_t period) {
             auto it = index_interval_to_str.find(period);
             if(it == index_interval_to_str.end()) return;
+            std::string s = to_lower_case(symbol);
             json j;
             j["method"] = "UNSUBSCRIBE";
             j["params"] = json::array();
-            std::string param = symbol + "@kline_" + it->second;
+            std::string param = s + "@kline_" + it->second;
             j["params"][0] = param;
             j["id"] = 1;
             {
                 std::lock_guard<std::mutex> lock(list_subscriptions_mutex);
                 /* имя символа ОБЯЗАТЕЛЬНО В НИЖНЕМ РЕГИСТРЕ! */
-                auto it_symbol = list_subscriptions.find(symbol);
+                auto it_symbol = list_subscriptions.find(s);
                 if(it_symbol != list_subscriptions.end()) {
                     auto it_period = it_symbol->second.find(period);
                     if(it_period != it_symbol->second.end()) {
@@ -619,6 +648,275 @@ namespace binance_api {
                             }
                             is_open = true;
                             //std::cout << "on_open" << std::endl;
+                        };
+
+                        client->on_close =
+                                [&](std::shared_ptr<WssClient::Connection> /*connection*/,
+                                int status, const std::string & /*reason*/) {
+                            is_websocket_init = false;
+                            is_open = false;
+                            is_error = true;
+                            {
+                                std::lock_guard<std::mutex> lock(save_connection_mutex);
+                                if(save_connection) save_connection.reset();
+                            }
+                            std::cerr
+                                << point
+                                << " closed connection with status code " << status
+                                << std::endl;
+                        };
+
+                        // See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
+                        client->on_error =
+                                [&](std::shared_ptr<WssClient::Connection> /*connection*/,
+                                const SimpleWeb::error_code &ec) {
+                            is_websocket_init = false;
+                            is_open = false;
+                            is_error = true;
+
+                            {
+                                std::lock_guard<std::mutex> lock(save_connection_mutex);
+                                if(save_connection) save_connection.reset();
+                            }
+
+                            std::cerr
+                                << point
+                                << " wss error: " << ec
+                                << std::endl;
+                        };
+                        client->start();
+                        client.reset();
+                    } catch (std::exception& e) {
+                        is_websocket_init = false;
+                        is_error = true;
+                    }
+                    catch (...) {
+                        is_websocket_init = false;
+                        is_error = true;
+                    }
+                    if(is_close_connection) break;
+					const uint64_t RECONNECT_DELAY = 1000;
+					std::this_thread::sleep_for(std::chrono::milliseconds(RECONNECT_DELAY));
+                } // while
+            });
+        }
+    };
+
+
+    /** \brief Класс потока пользовательских данных
+     */
+    class UserDataStreams {
+    private:
+        using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
+        using json = nlohmann::json;
+        //std::string point = "stream.binance.com:9443/ws/";
+        std::string point = "stream.binancefuture.com/ws/";
+        std::string sert_file = "curl-ca-bundle.crt";
+        std::string listen_key;
+
+        std::shared_ptr<WssClient::Connection> save_connection;
+        std::shared_ptr<WssClient> client;      /**< Webclosket Клиент */
+        std::future<void> client_future;		/**< Поток соединения */
+        std::mutex save_connection_mutex;
+
+        std::atomic<bool> is_websocket_init;    /**< Состояние соединения */
+        std::atomic<bool> is_error;             /**< Ошибка соединения */
+        std::atomic<bool> is_close_connection;  /**< Флаг для закрытия соединения */
+        std::atomic<bool> is_open;
+
+        std::string error_message;
+        std::recursive_mutex error_message_mutex;
+
+        /** \brief Парсер сообщения от вебсокета
+         * \param response Ответ от сервера
+         */
+        void parser(const std::string &response) {
+            try {
+                json j = json::parse(response);
+                const std::string event = j["e"];
+
+                if(event == "ACCOUNT_UPDATE") {
+                    json j_ab = j["a"]["B"];
+                    for(size_t  i = 0; i < j_ab.size(); ++i) {
+                        std::string symbol = j_ab[i]["s"];
+                        TypesPositionSide position_side = TypesPositionSide::NONE;
+                        if(j_ab[i]["ps"] == "LONG") position_side = TypesPositionSide::LONG;
+                        else if(j_ab[i]["ps"] == "SHORT") position_side = TypesPositionSide::SHORT;
+                        else if(j_ab[i]["ps"] == "BOTH") position_side = TypesPositionSide::BOTH;
+                    }
+                } else
+                if(event == "ORDER_TRADE_UPDATE") {
+
+                } else
+                if(event == "MARGIN_CALL") {
+                    json j_p = j["p"];
+                    for(size_t  i = 0; i < j_p.size(); ++i) {
+                        std::string symbol = j_p[i]["s"];
+                        TypesPositionSide position_side = TypesPositionSide::NONE;
+                        if(j_p[i]["ps"] == "LONG") position_side = TypesPositionSide::LONG;
+                        else if(j_p[i]["ps"] == "SHORT") position_side = TypesPositionSide::SHORT;
+                        else if(j_p[i]["ps"] == "BOTH") position_side = TypesPositionSide::BOTH;
+                    }
+                }
+            }
+            catch(const json::parse_error& e) {
+            }
+            catch(json::out_of_range& e) {
+            }
+            catch(json::type_error& e) {
+            }
+            catch(...) {
+            }
+        }
+
+        void send(const std::string &message) {
+            std::lock_guard<std::mutex> lock(save_connection_mutex);
+            if(!save_connection) return;
+            save_connection->send(message);
+        }
+
+        std::string to_upper_case(const std::string &s){
+            std::string temp = s;
+            std::transform(temp.begin(), temp.end(), temp.begin(), [](char ch) {
+                return std::use_facet<std::ctype<char>>(std::locale()).toupper(ch);
+            });
+            return temp;
+        }
+
+        std::string to_lower_case(const std::string &s){
+            std::string temp = s;
+            std::transform(temp.begin(), temp.end(), temp.begin(), [](char ch) {
+                return std::use_facet<std::ctype<char>>(std::locale()).tolower(ch);
+            });
+            return temp;
+        }
+
+    public:
+        std::function<void(const std::string &data)> on_data = nullptr;
+
+        /** \brief Конструктор класса для получения потока пользовательских данных
+         * \param user_listen_key Ключ потока, который необходимо получить через REST API
+         * \param is_demo Использовать Demo API или API для реальной торговли
+         * \param user_sert_file Файл-сертификат. По умолчанию используется от curl: curl-ca-bundle.crt
+         */
+        UserDataStreams(
+                const std::string &user_listen_key,
+                const bool is_demo = true,
+                const std::string user_sert_file = "curl-ca-bundle.crt") :
+                listen_key(user_listen_key) {
+            /* инициализируем переменные */
+            if(is_demo) point = "stream.binancefuture.com/ws/";
+            else point = "stream.binance.com:9443/ws/";
+            sert_file = user_sert_file;
+            is_websocket_init = false;
+            is_close_connection = false;
+            is_error = false;
+            is_open = false;
+        }
+
+        ~UserDataStreams() {
+            is_close_connection = true;
+            std::shared_ptr<WssClient> client_ptr = std::atomic_load(&client);
+            if(client_ptr) {
+                client_ptr->stop();
+            }
+
+            if(client_future.valid()) {
+                try {
+                    client_future.wait();
+                    client_future.get();
+                }
+                catch(const std::exception &e) {
+                    std::cerr << "binance_api::~CandlestickStreams() error, what: " << e.what() << std::endl;
+                }
+                catch(...) {
+                    std::cerr << "binance_api::~CandlestickStreams() error" << std::endl;
+                }
+            }
+        };
+
+        /** \brief Состояние соединения
+         * \return вернет true, если соединение есть
+         */
+        inline bool connected() {
+            return is_websocket_init;
+        }
+
+        /** \brief Подождать соединение
+         *
+         * Данный метод ждет, пока не установится соединение
+         * \return вернет true, если соединение есть, иначе произошла ошибка
+         */
+        inline bool wait() {
+            uint32_t tick = 0;
+            while(!is_error && !is_open && !is_close_connection) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                ++tick;
+                const uint32_t MAX_TICK = 10*100*5;
+                if(tick > MAX_TICK) {
+                    is_error = true;
+                    return is_open;
+                }
+            }
+            return is_open;
+        }
+
+        /** \brief Проверить наличие ошибки
+         * \return вернет true, если была ошибка
+         */
+        inline bool check_error() {
+            return is_error;
+        }
+
+        /** \brief Очистить состояние ошибки
+         */
+        inline void clear_error() {
+            is_error = false;
+            std::lock_guard<std::recursive_mutex> lock(error_message_mutex);
+            error_message.clear();
+        }
+
+        /** \brief Получить текст сообщения об ошибке
+         * \return сообщения об ошибке, если есть
+         */
+        std::string get_error_message() {
+            std::lock_guard<std::recursive_mutex> lock(error_message_mutex);
+            if(is_error) return error_message;
+            return std::string();
+        }
+
+        /** \brief Запустить поток
+         */
+        void start() {
+            if(client_future.valid()) return;
+            /* запустим соединение в отдельном потоке */
+            client_future = std::async(std::launch::async,[&]() {
+                while(!is_close_connection) {
+                    try {
+                        /* создадим соединение */;
+                        client = std::make_shared<WssClient>(
+                                (point + listen_key),
+                                true,
+                                std::string(),
+                                std::string(),
+                                std::string(sert_file));
+
+                        /* читаем собщения, которые пришли */
+                        client->on_message =
+                                [&](std::shared_ptr<WssClient::Connection> connection,
+                                std::shared_ptr<WssClient::InMessage> message) {
+                            parser(message->string());
+                            std::cout << "on_message " << message->string() << std::endl;
+                        };
+
+                        client->on_open =
+                            [&](std::shared_ptr<WssClient::Connection> connection) {
+                            {
+                                std::lock_guard<std::mutex> lock(save_connection_mutex);
+                                save_connection = connection;
+                            }
+                            is_open = true;
+                            std::cout << "on_open" << std::endl;
                         };
 
                         client->on_close =

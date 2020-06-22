@@ -1,0 +1,9 @@
+#ifndef BINANCE_CPP_API_BOT_HPP_INCLUDED
+#define BINANCE_CPP_API_BOT_HPP_INCLUDED
+
+namespace binance_api {
+
+
+}
+
+#endif // BINANCE_CPP_API_BOT_HPP_INCLUDED

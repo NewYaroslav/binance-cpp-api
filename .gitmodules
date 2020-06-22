@@ -19,3 +19,15 @@
 [submodule "lib/zstd"]
 	path = lib/zstd
 	url = https://github.com/facebook/zstd.git
+[submodule "lib/curl-7.60.0-win64-mingw"]
+	path = lib/curl-7.60.0-win64-mingw
+	url = https://github.com/NewYaroslav/curl-7.60.0-win64-mingw.git
+[submodule "lib/gzip-hpp"]
+	path = lib/gzip-hpp
+	url = https://github.com/NewYaroslav/gzip-hpp.git
+[submodule "lib/zlib"]
+	path = lib/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "lib/hmac-cpp"]
+	path = lib/hmac-cpp
+	url = https://github.com/NewYaroslav/hmac-cpp.git
