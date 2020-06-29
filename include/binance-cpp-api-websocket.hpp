@@ -1,5 +1,5 @@
 /*
-* intrade-bar-api-cpp - C ++ API client for intrade.bar
+* binance-cpp-api - C ++ API client for binance
 *
 * Copyright (c) 2019 Elektro Yar. Email: git.electroyar@gmail.com
 *
@@ -34,6 +34,7 @@
 #include <mutex>
 #include <atomic>
 #include <future>
+#include <cstdlib>
 //#include "utf8.h" // http://utfcpp.sourceforge.net/
 
 /*
@@ -51,7 +52,7 @@ namespace binance_api {
         using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
         using json = nlohmann::json;
         std::string point = "stream.binancefuture.com/stream";
-        //std::string point = "stream.binance.com:9443/stream";
+        //std::string point = "fstream.binance.com/stream";
         std::string sert_file = "curl-ca-bundle.crt";
 
         std::shared_ptr<WssClient::Connection> save_connection;
@@ -296,7 +297,7 @@ namespace binance_api {
                 const std::string user_sert_file = "curl-ca-bundle.crt") {
             /* инициализируем переменные */
             if(is_demo) point = "stream.binancefuture.com/stream";
-            else point = "stream.binance.com:9443/stream";
+            else point = "fstream.binance.com/stream";
             sert_file = user_sert_file;
             offset_timestamp = 0;
             is_websocket_init = false;
@@ -709,7 +710,7 @@ namespace binance_api {
     private:
         using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
         using json = nlohmann::json;
-        //std::string point = "stream.binance.com:9443/ws/";
+        //std::string point = "fstream.binance.com/ws/";
         std::string point = "stream.binancefuture.com/ws/";
         std::string sert_file = "curl-ca-bundle.crt";
         std::string listen_key;
@@ -727,45 +728,76 @@ namespace binance_api {
         std::string error_message;
         std::recursive_mutex error_message_mutex;
 
+        std::map<std::string, BalanceSpec> balances;
+        std::recursive_mutex balances_mutex;
+
+        std::map<std::string, std::map<TypesPositionSide, PositionSpec>> positions;
+        std::recursive_mutex positions_mutex;
+
+
         /** \brief Парсер сообщения от вебсокета
          * \param response Ответ от сервера
          */
         void parser(const std::string &response) {
             try {
                 json j = json::parse(response);
+                //std::cout << "on_message " << std::endl << j.dump(4) << std::endl;
                 const std::string event = j["e"];
 
                 if(event == "ACCOUNT_UPDATE") {
                     json j_ab = j["a"]["B"];
                     for(size_t  i = 0; i < j_ab.size(); ++i) {
-                        std::string symbol = j_ab[i]["s"];
-                        TypesPositionSide position_side = TypesPositionSide::NONE;
-                        if(j_ab[i]["ps"] == "LONG") position_side = TypesPositionSide::LONG;
-                        else if(j_ab[i]["ps"] == "SHORT") position_side = TypesPositionSide::SHORT;
-                        else if(j_ab[i]["ps"] == "BOTH") position_side = TypesPositionSide::BOTH;
+                        const std::string asset = j_ab[i]["a"];
+                        const double wallet_balance = std::atof(std::string(j_ab[i]["wb"]).c_str());
+                        const double cross_wallet_balance = std::atof(std::string(j_ab[i]["cw"]).c_str());
+                        std::lock_guard<std::recursive_mutex> lock(balances_mutex);
+                        balances[asset] = BalanceSpec(asset, wallet_balance, cross_wallet_balance);
+                    }
+                    if(on_balance != nullptr) {
+                        std::lock_guard<std::recursive_mutex> lock(balances_mutex);
+                        for(auto &it : balances) {
+                            on_balance(it.second);
+                        }
+                    }
+                    json j_ap = j["a"]["P"];
+                    for(size_t  i = 0; i < j_ap.size(); ++i) {
+                        PositionSpec position;
+                        position.symbol = j_ap[i]["s"];
+                        position.position_amount = std::atof(std::string(j_ap[i]["pa"]).c_str());
+                        position.position_side = TypesPositionSide::NONE;
+                        if(j_ap[i]["ps"] == "BOTH") position.position_side = TypesPositionSide::BOTH;
+                        else if(j_ap[i]["ps"] == "LONG") position.position_side = TypesPositionSide::LONG;
+                        else if(j_ap[i]["ps"] == "SHORT") position.position_side = TypesPositionSide::SHORT;
+                        std::lock_guard<std::recursive_mutex> lock(positions_mutex);
+                        positions[position.symbol][position.position_side] = position;
+                    }
+                    if(on_position != nullptr) {
+                        std::lock_guard<std::recursive_mutex> lock(positions_mutex);
+                        for(auto &it : positions) {
+                            for(auto &p_it : it.second) {
+                                on_position(p_it.second);
+                            }
+                        }
                     }
                 } else
                 if(event == "ORDER_TRADE_UPDATE") {
 
                 } else
                 if(event == "MARGIN_CALL") {
-                    json j_p = j["p"];
-                    for(size_t  i = 0; i < j_p.size(); ++i) {
-                        std::string symbol = j_p[i]["s"];
-                        TypesPositionSide position_side = TypesPositionSide::NONE;
-                        if(j_p[i]["ps"] == "LONG") position_side = TypesPositionSide::LONG;
-                        else if(j_p[i]["ps"] == "SHORT") position_side = TypesPositionSide::SHORT;
-                        else if(j_p[i]["ps"] == "BOTH") position_side = TypesPositionSide::BOTH;
-                    }
+
                 }
             }
             catch(const json::parse_error& e) {
+                std::cerr << "binance_api::UserDataStreams parser error (json::parse_error), what: " << std::string(e.what()) << std::endl;
             }
-            catch(json::out_of_range& e) {
+            catch(const json::out_of_range& e) {
+                std::cerr << "binance_api::UserDataStreams parser error (json::out_of_range), what: " << std::string(e.what()) << std::endl;
             }
-            catch(json::type_error& e) {
+            catch(const json::type_error& e) {
+                std::cerr << "binance_api::UserDataStreams parser error (json::type_error), what: " << std::string(e.what()) << std::endl;
             }
             catch(...) {
+                std::cerr << "binance_api::UserDataStreams parser error" << std::endl;
             }
         }
 
@@ -792,7 +824,54 @@ namespace binance_api {
         }
 
     public:
+        std::function<void(const BalanceSpec &balance)> on_balance = nullptr;
+        std::function<void(const PositionSpec &position)> on_position = nullptr;
         std::function<void(const std::string &data)> on_data = nullptr;
+
+        /** \brief Получить баланс колешька
+         * \param asset Актив
+         * \param balance Баланс колешька
+         * \return Вернет true, если баланс кошелька есть
+         */
+        bool get_balance(const std::string &asset, BalanceSpec &balance) {
+            std::lock_guard<std::recursive_mutex> lock(balances_mutex);
+            auto it = balances.find(asset);
+            if(it == balances.end()) return false;
+            balance = it->second;
+            return true;
+        }
+
+        /** \brief Получить позицию
+         * \param symbol Символ
+         * \param position_side Тип позиции (SHORT, LONG, BOTH)
+         * \param position Данные по позиции
+         * \return Вернет true, если баланс кошелька есть
+         */
+        bool get_position(const std::string &symbol, const TypesPositionSide position_side, PositionSpec &position) {
+            std::lock_guard<std::recursive_mutex> lock(positions_mutex);
+            auto it = positions.find(symbol);
+            if(it == positions.end()) return false;
+            auto p_it = it->second.find(position_side);
+            if(p_it == it->second.end()) return false;
+            position = p_it->second;
+            return true;
+        }
+
+        /** \brief Установить позицию
+         * \param position Позиция
+         */
+        void set_position(const PositionSpec &position) {
+            std::lock_guard<std::recursive_mutex> lock(positions_mutex);
+            positions[position.symbol][position.position_side] = position;
+        }
+
+        /** \brief Установить баланс
+         * \param balance Баланс
+         */
+        void set_balance(const BalanceSpec &balance) {
+            std::lock_guard<std::recursive_mutex> lock(balances_mutex);
+            balances[balance.asset] = balance;
+        }
 
         /** \brief Конструктор класса для получения потока пользовательских данных
          * \param user_listen_key Ключ потока, который необходимо получить через REST API
@@ -806,7 +885,7 @@ namespace binance_api {
                 listen_key(user_listen_key) {
             /* инициализируем переменные */
             if(is_demo) point = "stream.binancefuture.com/ws/";
-            else point = "stream.binance.com:9443/ws/";
+            else point = "fstream.binance.com/ws/";
             sert_file = user_sert_file;
             is_websocket_init = false;
             is_close_connection = false;
@@ -827,10 +906,10 @@ namespace binance_api {
                     client_future.get();
                 }
                 catch(const std::exception &e) {
-                    std::cerr << "binance_api::~CandlestickStreams() error, what: " << e.what() << std::endl;
+                    std::cerr << "binance_api::~UserDataStreams() error, what: " << e.what() << std::endl;
                 }
                 catch(...) {
-                    std::cerr << "binance_api::~CandlestickStreams() error" << std::endl;
+                    std::cerr << "binance_api::~UserDataStreams() error" << std::endl;
                 }
             }
         };
@@ -906,7 +985,7 @@ namespace binance_api {
                                 [&](std::shared_ptr<WssClient::Connection> connection,
                                 std::shared_ptr<WssClient::InMessage> message) {
                             parser(message->string());
-                            std::cout << "on_message " << message->string() << std::endl;
+                            //std::cout << "on_message " << message->string() << std::endl;
                         };
 
                         client->on_open =
@@ -916,7 +995,7 @@ namespace binance_api {
                                 save_connection = connection;
                             }
                             is_open = true;
-                            std::cout << "on_open" << std::endl;
+                            //std::cout << "on_open" << std::endl;
                         };
 
                         client->on_close =

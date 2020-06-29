@@ -1,0 +1,89 @@
+{
+	"api_key": "*********************************************7d247",
+	"secret_key": "a8************************************************0",
+	"named_pipe": "binance_api_bot",
+	"sert_file": "curl-ca-bundle.crt",
+	"cookie_file": "binance-api.cookie",
+	"candles": 1440,
+	"path": "C:\\Users\\user\\AppData\\Roaming\\MetaQuotes\\Terminal\\******************************\\history\\RoboForex-Demo",
+	"symbols": [
+		{
+			"symbol":"BTCUSDT",
+			"period":1
+		},
+		{
+			"symbol":"BTCUSDT",
+			"period":3
+		},
+		{
+			"symbol":"BTCUSDT",
+			"period":5
+		},
+		{
+			"symbol":"BTCUSDT",
+			"period":15
+		},
+		{
+			"symbol":"BTCUSDT",
+			"period":30
+		},
+		{
+			"symbol":"BTCUSDT",
+			"period":60
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":1
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":3
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":5
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":15
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":30
+		},
+		{
+			"symbol":"LTCUSDT",
+			"period":60
+		}
+	],
+	"leverages": [
+		{
+			"symbol":"BTCUSDT",
+			"leverage":20
+		},
+		{
+			"symbol":"ETCUSDT",
+			"leverage":20
+		},
+		{
+			"symbol":"LTCUSDT",
+			"leverage":20
+		}
+	],
+	"margin_types": [
+		{
+			"symbol":"BTCUSDT",
+			"margin_type":"CROSSED"
+		},
+		{
+			"symbol":"ETCUSDT",
+			"margin_type":"CROSSED"
+		},
+		{
+			"symbol":"LTCUSDT",
+			"margin_type":"CROSSED"
+		}
+	],
+	"position_mode":"hedge_mode",
+	"recv_window":60000
+}

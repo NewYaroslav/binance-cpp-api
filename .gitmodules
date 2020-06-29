@@ -31,3 +31,6 @@
 [submodule "lib/hmac-cpp"]
 	path = lib/hmac-cpp
 	url = https://github.com/NewYaroslav/hmac-cpp.git
+[submodule "lib/simple-named-pipe-server"]
+	path = lib/simple-named-pipe-server
+	url = https://github.com/NewYaroslav/simple-named-pipe-server.git

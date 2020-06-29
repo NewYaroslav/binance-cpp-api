@@ -1,3 +1,26 @@
+/*
+* binance-cpp-api - C ++ API client for binance
+*
+* Copyright (c) 2019 Elektro Yar. Email: git.electroyar@gmail.com
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in
+* all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*/
 #ifndef BINANCE_CPP_API_COMMON_HPP_INCLUDED
 #define BINANCE_CPP_API_COMMON_HPP_INCLUDED
 
@@ -14,13 +37,19 @@ namespace binance_api {
     namespace common {
         using json = nlohmann::json;
 
-        /// Типы хеджирования
-        enum class TypesPositionMode {
-            None = -1,
-            Hedge_Mode = 0,     /**< режим хеджирования */
-            One_way_Mode = 1,   /**< односторонний режим */
+        /// Типы маржи
+        enum class TypesMargin {
+            NONE = 0,       /**< Нет сделки */
+            ISOLATED = 1,
+            CROSSED = 2,
         };
 
+        /// Типы хеджирования
+        enum class TypesPositionMode {
+            NONE = 0,
+            Hedge_Mode = 1,     /**< режим хеджирования */
+            One_way_Mode = 2,   /**< односторонний режим */
+        };
 
         /// Типы направления сделок
         enum class TypesSide {
@@ -35,6 +64,17 @@ namespace binance_api {
             SHORT = -1, /**< Продажа */
             LONG = 1,   /**< Покупка */
             BOTH = 2,
+        };
+
+        /// Типы состояний ордра
+        enum class TypesOrderStatus {
+            NONE = 0,                   /**< Нет типа */
+            NEW = 1,                    /**< Новый ордер */
+            PARTIALLY_FILLED = 2,
+            FILLED = 3,
+            CANCELED = 4,
+            REJECTED = 5,
+            EXPIRED = 6,
         };
 
         /// Типы сделок
@@ -73,8 +113,13 @@ namespace binance_api {
             WAF_LIMIT = -10,                    ///< нарушении лимита WAF (брандмауэр веб-приложений).
             NO_RESPONSE_WAITING_PERIOD = -11,
             INVALID_PARAMETER = -12,
-            ORDER_WOULD_IMMEDIATELY_TRIGGER = -2021,    ///< Заказ сразу сработает.
-
+            INVALID_TIMESTAMP = -1021,                  /**< Временная метка для этого запроса находится за пределами recvWindow или Временная метка для этого запроса была на 1000 мс раньше времени сервера. */
+            NO_SUCH_ORDER = -2013,                      /**< Заказ не существует */
+            ORDER_WOULD_IMMEDIATELY_TRIGGER = -2021,    /**< Заказ сразу сработает. */
+            NO_NEED_TO_CHANGE_MARGIN_TYPE = -4046,      /**< Нет необходимости изменения типа маржи */
+            NO_NEED_TO_CHANGE_POSITION_SIDE = -4059,    /**< Нет необходимости менять положение стороны. */
+            POSITION_SIDE_NOT_MATCH = -4061,            /**< Сторона позиции ордера не соответствует настройке пользователя. */
+            POSITION_SIDE_CHANGE_EXISTS_QUANTITY = -4068,/**< Сторона позиции не может быть изменена, если существует позиция */
         };
 
         /*
@@ -98,29 +143,32 @@ namespace binance_api {
             SymbolSpec() {};
         };
 
+        /** \brief Параметры позиции
+         */
         class PositionSpec {
         public:
-            std::string symbol;
-            uint32_t leverage = 0;
+            std::string symbol;         /**< Символ */
             TypesPositionSide position_side = TypesPositionSide::NONE;
-            double entry_price = 0;
-            double initial_margin = 0;
-            double position_initial_margin = 0;
-            double open_order_initial_margin = 0;
-            double unrealized_profit = 0;
-            bool isolated = false;
+            double position_amount = 0; /**< Размер позиции (если 0, то позиции нет) */
             PositionSpec() {};
         };
 
-        class WalletSpec {
+        /** \brief Параметры сбаланса
+         */
+        class BalanceSpec {
         public:
-            double total_margin_balance = 0;
-            double total_wallet_balance = 0;
-            double max_withdraw_amount = 0;
-            bool can_deposit = false;
-            bool can_reade = false;
-            bool can_withdraw = false;
-            WalletSpec() {};
+            std::string asset;                  /**< Актив */
+            double wallet_balance = 0;          /**< Баланс кошелька */
+            double cross_wallet_balance = 0;    /**< Баланс кошелька */
+            BalanceSpec() {};
+            BalanceSpec(
+                const std::string &_asset,
+                const double _wallet_balance,
+                const double _cross_wallet_balance) :
+                asset(_asset),
+                wallet_balance(_wallet_balance),
+                cross_wallet_balance(_cross_wallet_balance) {
+            };
         };
 
         /** \brief Открыть файл JSON
@@ -209,6 +257,40 @@ namespace binance_api {
             std::transform(temp.begin(), temp.end(),temp.begin(), ::toupper);
             return temp;
         }
+
+        inline std::string get_uuid(const double ftimestamp) {
+            uint64_t timestamp1000 = ftimestamp * 1000.0 + 0.5;
+            std::string temp(CBase36::encodeInt(timestamp1000));
+            temp += CBase36::randomString(10,11);
+            std::transform(temp.begin(), temp.end(),temp.begin(), ::toupper);
+            return temp;
+        }
+
+        std::string url_encode(std::string str){
+            std::string new_str = "";
+            char c;
+            int ic;
+            const char* chars = str.c_str();
+            char bufHex[10];
+            int len = strlen(chars);
+
+            for(int i=0;i<len;i++){
+                c = chars[i];
+                ic = c;
+                // uncomment this if you want to encode spaces with +
+                /*if (c==' ') new_str += '+';
+                else */if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
+                else {
+                    sprintf(bufHex,"%X",c);
+                    if(ic < 16)
+                        new_str += "%0";
+                    else
+                        new_str += "%";
+                    new_str += bufHex;
+                }
+            }
+            return new_str;
+         }
     }
 }
 
