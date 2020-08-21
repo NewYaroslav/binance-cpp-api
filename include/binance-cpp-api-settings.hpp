@@ -26,7 +26,10 @@ namespace binance_api {
 
         uint32_t candles = 1440;                            /**< Количество баров истории */
         uint32_t recv_window = 60000;                       /**< Время ответа от сервера для критически важных запросов */
+        int64_t timezone = 0;                               /**< Часовой пояс - смещение метки времени котировок на указанное число секунд */
         bool demo = true;                                   /**< Флаг демо аккаунта */
+        bool demo_candlestick_stream = false;               /**< Флаг демо аккаунта для потока котировок */
+        bool futures_candlestick_stream = false;            /**< Флаг фьючерсов */
 
         bool is_error = false;
 
@@ -64,10 +67,13 @@ namespace binance_api {
             try {
                 if(j["api_key"] != nullptr) api_key = j["api_key"];
                 if(j["secret_key"] != nullptr) secret_key = j["secret_key"];
-                //if(j["demo"] != nullptr) named_pipe = j["demo"];
+                if(j["demo"] != nullptr) demo = j["demo"];
+                if(j["demo_candlestick_stream"] != nullptr) demo_candlestick_stream = j["demo_candlestick_stream"];
+                if(j["futures_candlestick_stream"] != nullptr) futures_candlestick_stream = j["futures_candlestick_stream"];
                 if(j["named_pipe"] != nullptr) named_pipe = j["named_pipe"];
                 if(j["candles"] != nullptr) candles = j["candles"];
                 if(j["recv_window"] != nullptr) recv_window = j["recv_window"];
+                if(j["timezone"] != nullptr) timezone = j["timezone"];
                 if(j["path"] != nullptr) path = j["path"];
                 if(j["symbols"] != nullptr && j["symbols"].is_array()) {
                     const size_t symbols_size = j["symbols"].size();

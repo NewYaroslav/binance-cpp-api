@@ -2,12 +2,12 @@
 <CodeBlocks_project_file>
 	<FileVersion major="1" minor="6" />
 	<Project>
-		<Option title="binance-api-websocket" />
+		<Option title="check-websocket" />
 		<Option pch_mode="2" />
 		<Option compiler="mingw_64_7_3_0" />
 		<Build>
 			<Target title="Release">
-				<Option output="binance-api-websocket" prefix_auto="1" extension_auto="1" />
+				<Option output="bin/Release/check-websocket" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Release/" />
 				<Option type="1" />
 				<Option compiler="mingw_64_7_3_0" />
@@ -24,8 +24,6 @@
 					<Add directory="../../lib/json/include" />
 					<Add directory="../../lib/xtime_cpp/src" />
 					<Add directory="../../lib/boost_1_71_0/include/boost-1_71" />
-					<Add directory="../../lib/xquotes_history/include" />
-					<Add directory="../../lib/utf8_v2_3_4/source" />
 					<Add directory="../../include" />
 				</Compiler>
 				<Linker>
@@ -45,7 +43,6 @@
 					<Add directory="../../lib/json/include" />
 					<Add directory="../../lib/xtime_cpp/src" />
 					<Add directory="../../lib/xquotes_history/include" />
-					<Add directory="../../lib/utf8_v2_3_4/source" />
 					<Add directory="../../include" />
 				</Linker>
 			</Target>
@@ -54,17 +51,13 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
-		<Unit filename="../../include/binance-cpp-api-common.hpp" />
-		<Unit filename="../../include/binance-cpp-api-websocket.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/client_ws.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/client_wss.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/crypto.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/status_code.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/utility.hpp" />
-		<Unit filename="../../lib/xquotes_history/include/xquotes_common.hpp" />
 		<Unit filename="../../lib/xtime_cpp/src/xtime.cpp" />
 		<Unit filename="../../lib/xtime_cpp/src/xtime.hpp" />
-		<Unit filename="binance-api-websocket.cbp" />
 		<Unit filename="main.cpp" />
 		<Unit filename="pch.hpp">
 			<Option compile="1" />

@@ -69,10 +69,11 @@
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Unit filename="../../include/binance-cpp-api-common.hpp" />
-		<Unit filename="../../include/binance-cpp-api-http.hpp" />
 		<Unit filename="../../include/binance-cpp-api-settings.hpp" />
 		<Unit filename="../../include/binance-cpp-api-websocket.hpp" />
 		<Unit filename="../../include/binance-cpp-api.hpp" />
+		<Unit filename="../../include/binance-cpp-fapi-http.hpp" />
+		<Unit filename="../../include/binance-cpp-sapi-http.hpp" />
 		<Unit filename="../../include/tools/base36.h" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/client_ws.hpp" />
 		<Unit filename="../../lib/Simple-WebSocket-Server/client_wss.hpp" />

@@ -37,6 +37,28 @@ namespace binance_api {
     namespace common {
         using json = nlohmann::json;
 
+        enum TypesOpenOrderStatus {
+            OPEN_ORDER_STATUS_ERROR_10 = -10,   /**< Ошибка получения цены криптовалюты для установки тейк-профита или стоп-лосса */
+            OPEN_ORDER_STATUS_ERROR_9 = -9,
+            OPEN_ORDER_STATUS_ERROR_8 = -8,
+            OPEN_ORDER_STATUS_ERROR_7 = -7,
+            OPEN_ORDER_STATUS_ERROR_6 = -6,
+            OPEN_ORDER_STATUS_ERROR_5 = -5,
+            OPEN_ORDER_STATUS_ERROR_4 = -4,
+            OPEN_ORDER_STATUS_ERROR_3 = -3,
+            OPEN_ORDER_STATUS_ERROR_2 = -2,
+            OPEN_ORDER_STATUS_ERROR_1 = -1,
+            OPEN_ORDER_STATUS_OPEN = 0,
+            OPEN_ORDER_STATUS_CLOSE_1 = 1,
+            OPEN_ORDER_STATUS_CLOSE_2 = 2,
+            OPEN_ORDER_STATUS_CLOSE_3 = 3,
+        };
+
+        enum class TypesWorking {
+            MARK_PRICE = 0,
+            CONTRACT_PRICE = 1,
+        };
+
         /// Типы маржи
         enum class TypesMargin {
             NONE = 0,       /**< Нет сделки */
@@ -113,6 +135,7 @@ namespace binance_api {
             WAF_LIMIT = -10,                    ///< нарушении лимита WAF (брандмауэр веб-приложений).
             NO_RESPONSE_WAITING_PERIOD = -11,
             INVALID_PARAMETER = -12,
+            NO_PRICE_STREAM_SUBSCRIPTION = -13,
             INVALID_TIMESTAMP = -1021,                  /**< Временная метка для этого запроса находится за пределами recvWindow или Временная метка для этого запроса была на 1000 мс раньше времени сервера. */
             NO_SUCH_ORDER = -2013,                      /**< Заказ не существует */
             ORDER_WOULD_IMMEDIATELY_TRIGGER = -2021,    /**< Заказ сразу сработает. */

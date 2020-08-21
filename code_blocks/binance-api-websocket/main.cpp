@@ -5,7 +5,8 @@ using namespace std;
 
 int main() {
     std::cout << "start" << std::endl;
-    binance_api::CandlestickStreams candlestick_streams;
+    binance_api::CandlestickStreams candlestick_streams(binance_api::CandlestickStreams::EndpointTypes::SPOT_REAL);
+    //binance_api::CandlestickStreams candlestick_streams("stream.binance.com:9443/stream");
     candlestick_streams.on_candle = [&](
             const std::string &symbol,
             const xquotes_common::Candle &candle,

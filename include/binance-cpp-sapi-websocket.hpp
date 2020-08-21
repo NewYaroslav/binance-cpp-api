@@ -21,10 +21,10 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 */
-#ifndef BINANCE_CPP_API_WEBSOCKET_HPP_INCLUDED
-#define BINANCE_CPP_API_WEBSOCKET_HPP_INCLUDED
+#ifndef BINANCE_CPP_SAPI_WEBSOCKET_HPP_INCLUDED
+#define BINANCE_CPP_SAPI_WEBSOCKET_HPP_INCLUDED
 
-#include <binance-cpp-api-common.hpp>
+#include "binance-cpp-api-common.hpp"
 #include "client_wss.hpp"
 #include <openssl/ssl.h>
 #include <wincrypt.h>
@@ -47,11 +47,11 @@ namespace binance_api {
 
     /** \brief Класс потока котировок для торговли Фьючерсами
      */
-    class CandlestickStreams {
+    class CandlestickStreamsSApi {
     private:
         using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
         using json = nlohmann::json;
-        std::string point = "stream.binancefuture.com/stream";
+        std::string point = "stream.binance.com:9443/stream";
         //std::string point = "fstream.binance.com/stream";
         std::string sert_file = "curl-ca-bundle.crt";
 
@@ -275,8 +275,8 @@ namespace binance_api {
          * \param user_point Конечная точка подключения
          * \param user_sert_file Файл-сертификат. По умолчанию используется от curl: curl-ca-bundle.crt
          */
-        CandlestickStreams(
-                const std::string user_point = "stream.binancefuture.com/stream",
+        CandlestickStreamsSApi(
+                const std::string user_point = "stream.binance.com:9443/stream",
                 const std::string user_sert_file = "curl-ca-bundle.crt") {
             /* инициализируем переменные */
             point = user_point;
@@ -286,41 +286,18 @@ namespace binance_api {
             is_close_connection = false;
             is_error = false;
             is_open = false;
-        };
-
-        /// Типы точек доступа для потока котировок
-        enum class EndpointTypes {
-            FUTURES_DEMO,
-            FUTURES_REAL,
-            SPOT_DEMO,
-            SPOT_REAL
-        };
+        }
 
         /** \brief Конструктор класс для получения потока котировок
-         * \param user_type Тип конечной точки подключения
+         * \param user_point Конечная точка подключения
          * \param user_sert_file Файл-сертификат. По умолчанию используется от curl: curl-ca-bundle.crt
          */
-        CandlestickStreams(
-                const EndpointTypes user_type,
+        CandlestickStreamsSApi(
+                const bool is_demo,
                 const std::string user_sert_file = "curl-ca-bundle.crt") {
             /* инициализируем переменные */
-            switch(user_type) {
-            case EndpointTypes::FUTURES_DEMO:
-                point = "stream.binancefuture.com/stream";
-                break;
-            case EndpointTypes::FUTURES_REAL:
-                point = "fstream.binance.com/stream";
-                break;
-            case EndpointTypes::SPOT_DEMO:
-                point = "testnet.binance.vision/stream";
-                break;
-            case EndpointTypes::SPOT_REAL:
-                point = "stream.binance.com:9443/stream";
-                break;
-            default:
-                point = "stream.binancefuture.com/stream";
-                break;
-            }
+            if(is_demo) point = "stream.binance.com:9443/stream";
+            else point = "testnet.binance.vision/stream";
             sert_file = user_sert_file;
             offset_timestamp = 0;
             is_websocket_init = false;
@@ -329,7 +306,7 @@ namespace binance_api {
             is_open = false;
         }
 
-        ~CandlestickStreams() {
+        ~CandlestickStreamsSApi() {
             is_close_connection = true;
             std::shared_ptr<WssClient> client_ptr = std::atomic_load(&client);
             if(client_ptr) {
@@ -745,7 +722,7 @@ namespace binance_api {
 
     /** \brief Класс потока пользовательских данных
      */
-    class UserDataStreams {
+    class UserDataStreamsSApi {
     private:
         using WssClient = SimpleWeb::SocketClient<SimpleWeb::WSS>;
         using json = nlohmann::json;
@@ -929,7 +906,7 @@ namespace binance_api {
          * \param is_demo Использовать Demo API или API для реальной торговли
          * \param user_sert_file Файл-сертификат. По умолчанию используется от curl: curl-ca-bundle.crt
          */
-        UserDataStreams(
+        UserDataStreamsSApi(
                 const std::string &user_listen_key,
                 const bool is_demo = true,
                 const std::string user_sert_file = "curl-ca-bundle.crt") :
@@ -944,7 +921,7 @@ namespace binance_api {
             is_open = false;
         }
 
-        ~UserDataStreams() {
+        ~UserDataStreamsSApi() {
             is_close_connection = true;
             std::shared_ptr<WssClient> client_ptr = std::atomic_load(&client);
             if(client_ptr) {
@@ -1102,4 +1079,4 @@ namespace binance_api {
     };
 }
 
-#endif // BINANCE_CPP_API_WEBSOCKET_HPP_INCLUDED
+#endif // BINANCE_CPP_SAPI_WEBSOCKET_HPP_INCLUDED

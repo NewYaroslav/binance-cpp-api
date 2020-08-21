@@ -2,7 +2,6 @@
 #include <fstream>
 
 #include "binance-cpp-api.hpp"
-#include "binance-cpp-api-http.hpp"
 #include "binance-cpp-api-websocket.hpp"
 
 int main(int argc, char **argv) {

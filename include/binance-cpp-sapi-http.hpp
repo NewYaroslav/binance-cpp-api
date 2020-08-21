@@ -21,10 +21,10 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 */
-#ifndef BINANCE_CPP_API_HTTP_HPP_INCLUDED
-#define BINANCE_CPP_API_HTTP_HPP_INCLUDED
+#ifndef BINANCE_CPP_SAPI_HTTP_HPP_INCLUDED
+#define BINANCE_CPP_SAPI_HTTP_HPP_INCLUDED
 
-#include <binance-cpp-api-common.hpp>
+#include "binance-cpp-api-common.hpp"
 #include <xquotes_common.hpp>
 #include <curl/curl.h>
 #include <gzip/decompress.hpp>
@@ -43,16 +43,16 @@ namespace binance_api {
     using json = nlohmann::json;
     using namespace common;
 
-    /** \brief Класс API брокера Binance
+    /** \brief Класс API брокера Binance для спотовой торговли
      */
-    class BinanceHttpApi {
+    class BinanceHttpSApi {
     private:
-        //std::string point = "https://fapi.binance.com";
-        std::string point = "https://testnet.binancefuture.com";
+        //std::string point = "https://api.binance.com";
+        std::string point = "https://testnet.binance.vision";
         std::string api_key;
         std::string secret_key;
         std::string sert_file = "curl-ca-bundle.crt";   /**< Файл сертификата */
-        std::string cookie_file = "binance-api.cookie"; /**< Файл cookie */
+        std::string cookie_file = "binance-sapi.cookie"; /**< Файл cookie */
 
         std::atomic<bool> is_demo = ATOMIC_VAR_INIT(true);  /**< Флаг демо-аккаунта */
         char error_buffer[CURL_ERROR_SIZE];
@@ -161,7 +161,6 @@ namespace binance_api {
 
         /** \brief Парсер строки, состоящей из пары параметров
          *
-         * Разделитель - символ @
          * \param value Строка
          * \param one Первое значение
          * \param two Второе значение
@@ -525,6 +524,14 @@ namespace binance_api {
             return temp;
         }
 
+        std::string to_upper_case(const std::string &s){
+            std::string temp = s;
+            std::transform(temp.begin(), temp.end(), temp.begin(), [](char ch) {
+                return std::use_facet<std::ctype<char>>(std::locale()).toupper(ch);
+            });
+            return temp;
+        }
+
         const std::map<uint32_t, std::string> index_interval_to_str = {
             {1,"1m"},{3,"3m"},{5,"5m"},{15,"15m"},{30,"30m"},
             {60,"1h"},{120,"2h"},{240,"4h"},{360,"6h"},{480,"8h"},{720,"12h"},
@@ -586,7 +593,7 @@ namespace binance_api {
                 json j_symbols = j["symbols"];
                 for(size_t i =0; i < j_symbols.size(); ++i) {
                     const std::string symbol = j_symbols[i]["symbol"];
-                    const uint32_t precision = j_symbols[i]["pricePrecision"];
+                    const uint32_t precision = j_symbols[i]["quoteAssetPrecision"];
                     bool is_active = false;
                     if(j_symbols[i]["status"] == "TRADING") is_active = true;
                     std::lock_guard<std::mutex> lock(symbols_spec_mutex);
@@ -608,7 +615,9 @@ namespace binance_api {
         int get_request_none_security(std::string &response, const std::string &url, const uint64_t weight = 1) {
             const std::string body;
             check_request_limit(weight);
-            HttpHeaders http_headers({"Accept-Encoding: gzip","Content-Type: application/json"});
+            HttpHeaders http_headers({
+                "Accept-Encoding: gzip",
+                "Content-Type: application/json"});
             int err = get_request(url, body, http_headers.get(), response, false, false);
             if(err != OK) {
                 try {
@@ -632,7 +641,10 @@ namespace binance_api {
             url += query_string;
             url += "&signature=";
             url += signature;
-            HttpHeaders http_headers({"Accept-Encoding: gzip","Content-Type: application/json",std::string("X-MBX-APIKEY: " + api_key)});
+            HttpHeaders http_headers({
+                "Accept-Encoding: gzip",
+                "Content-Type: application/json",
+                std::string("X-MBX-APIKEY: " + api_key)});
             const std::string body;
             check_request_limit(weight);
             int err = post_request(url, body, http_headers.get(), response, false, false);
@@ -658,7 +670,10 @@ namespace binance_api {
             url += query_string;
             url += "&signature=";
             url += signature;
-            HttpHeaders http_headers({"Accept-Encoding: gzip","Content-Type: application/json",std::string("X-MBX-APIKEY: " + api_key)});
+            HttpHeaders http_headers({
+                "Accept-Encoding: gzip",
+                "Content-Type: application/json",
+                std::string("X-MBX-APIKEY: " + api_key)});
             const std::string body;
             check_request_limit(weight);
             int err = put_request(url, body, http_headers.get(), response, false, false);
@@ -684,7 +699,10 @@ namespace binance_api {
             url += query_string;
             url += "&signature=";
             url += signature;
-            HttpHeaders http_headers({"Accept-Encoding: gzip","Content-Type: application/json",std::string("X-MBX-APIKEY: " + api_key)});
+            HttpHeaders http_headers({
+                "Accept-Encoding: gzip",
+                "Content-Type: application/json",
+                std::string("X-MBX-APIKEY: " + api_key)});
             const std::string body;
             check_request_limit(weight);
             int err = get_request(url, body, http_headers.get(), response, false, false);
@@ -734,8 +752,8 @@ namespace binance_api {
          * \param demo Флаг демо счета. По умолчанию true
          */
         void set_demo(const bool demo = true) {
-            if(demo) point = "https://testnet.binancefuture.com";
-            else point = "https://fapi.binance.com";
+            if(demo) point = "https://testnet.binance.vision";
+            else point = "https://api.binance.com";
             is_demo = demo;
         }
 
@@ -744,14 +762,13 @@ namespace binance_api {
          */
         bool ping() {
             std::string url(point);
-            url += "/fapi/v1/ping";
+            url += "/api/v3/ping";
             std::string response;
             int err = get_request_none_security(response, url);
             if(err != OK) return false;
             if(response == "{}") return true;
             return false;
         }
-
 
         /** \brief Получить текущие правила биржевой торговли и символьной информация
          *
@@ -762,7 +779,7 @@ namespace binance_api {
         int get_exchange_info() {
             std::string url(point);
             std::string response;
-            url += "/fapi/v1/exchangeInfo";
+            url += "/api/v3/exchangeInfo";
             int err = get_request_none_security(response, url);
             if(err != OK) return err;
             parse_exchange_info(response);
@@ -777,7 +794,7 @@ namespace binance_api {
          * \param limit Ограничение количества баров
          * \return Код ошибки
          */
-        int get_historical_data(
+        int get_historical_data_single_request(
                 std::vector<xquotes_common::Candle> &candles,
                 const std::string &symbol,
                 const uint32_t period,
@@ -786,13 +803,14 @@ namespace binance_api {
             if(it == index_interval_to_str.end()) return DATA_NOT_AVAILABLE;
             std::string url(point);
             std::string response;
-            url += "/fapi/v1/klines?";
+            url += "/api/v3/klines?";
             url += "symbol=";
-            url += to_lower_case(symbol);
+            url += to_upper_case(symbol);
             url += "&interval=";
             url += it->second;
             url += "&limit=";
             url += std::to_string(limit);
+            std::cout << url << std::endl;
             int err = get_request_none_security(response, url);
             if(err != OK) return err;
             parse_history(candles, response);
@@ -809,20 +827,20 @@ namespace binance_api {
          * \param limit Ограничение количества баров
          * \return Код ошибки
          */
-        int get_historical_data(
+        int get_historical_data_single_request(
                 std::vector<xquotes_common::Candle> &candles,
                 const std::string &symbol,
                 const uint32_t period,
                 const xtime::timestamp_t start_date,
                 const xtime::timestamp_t stop_date,
-                const uint32_t limit = 1500) {
+                const uint32_t limit = 1000) {
             auto it = index_interval_to_str.find(period);
             if(it == index_interval_to_str.end()) return DATA_NOT_AVAILABLE;
             std::string url(point);
             std::string response;
-            url += "/fapi/v1/klines?";
+            url += "/api/v3/klines?";
             url += "symbol=";
-            url += to_lower_case(symbol);
+            url += to_upper_case(symbol);
             url += "&interval=";
             url += it->second;
             url += "&startTime=";
@@ -837,699 +855,57 @@ namespace binance_api {
             return OK;
         }
 
-        /** \brief Изменить начальное кредитное плечо
+        /** \brief Получить исторические данные
+         * Данная функция может получать неограниченное количество баров
+         * \param candles Массив баров
          * \param symbol Имя символа
-         * \param leverage Кредитное плечо
-         * \param recv_window Время ожидания реакции сервера
+         * \param period Период
+         * \param start_date Дата начала загрузки
+         * \param stop_date Дата окончания загрузки
+         * \param limit Ограничение количества баров
          * \return Код ошибки
          */
-        int change_initial_leverage(
+        int get_historical_data(
+                std::vector<xquotes_common::Candle> &candles,
                 const std::string &symbol,
-                const uint32_t leverage,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            query_string += "&leverage=";
-            query_string += std::to_string(leverage);
-            url += "/fapi/v1/leverage?";
-            int err = post_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if(j["symbol"] != symbol || j["leverage"] != leverage) {
-                    return INVALID_PARAMETER;
+                const uint32_t period,
+                const xtime::timestamp_t start_date,
+                const xtime::timestamp_t stop_date) {
+
+            const uint64_t limit = 1000;
+            const uint64_t candle_time = period * xtime::SECONDS_IN_MINUTE;
+            const uint64_t step = candle_time * limit;
+            xtime::timestamp_t start_timestamp = start_date;
+            uint32_t attempt = 0;
+            uint32_t bars =  0;
+            while(true) {
+                std::vector<xquotes_common::Candle> temp;
+                xtime::timestamp_t stop_timestamp = start_timestamp + step - candle_time;
+                if(stop_timestamp > stop_date) stop_timestamp = stop_date;
+                int err = get_historical_data_single_request(temp, symbol, period, start_timestamp, stop_timestamp, limit);
+                if(err != OK) {
+                    if(attempt < 3) {
+                        ++attempt;
+                        const uint64_t DELAY = 5000;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(DELAY));
+                        continue;
+                    } else {
+                        attempt = 0;
+                    }
                 }
-            } catch(...) {
-                return INVALID_PARAMETER;
-            }
-            return OK;
-        }
 
-        /** \brief Изменить тип маржи
-         * \param symbol Имя символа
-         * \param margin_type Тип маржи
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки
-         */
-        int change_margin_type(
-                const std::string &symbol,
-                const TypesMargin margin_type,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            if(margin_type == TypesMargin::ISOLATED) query_string += "&marginType=ISOLATED";
-            else if(margin_type == TypesMargin::CROSSED) query_string += "&marginType=CROSSED";
-            else return INVALID_PARAMETER;
-            url += "/fapi/v1/marginType?";
-            int err = post_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) {
-                /* Нет необходимости изменения типа маржи */
-                if(err == NO_NEED_TO_CHANGE_MARGIN_TYPE) return OK;
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                if(j["code"] != 200) {
-                    return INVALID_PARAMETER;
+                if(temp.size() > 0) {
+                    candles.reserve(candles.size() + temp.size());
+                    //std::copy(candles.begin(), candles.end(), std::back_inserter(temp));
+                    candles.insert(candles.end(), temp.begin(), temp.end());
+                    bars += temp.size();
                 }
-            } catch(...) {
-                return INVALID_PARAMETER;
-            }
-            return OK;
-        }
 
-        /** \brief Установить тип хеджирования
-         * \param type Тип хеджирования (TypesPositionMode::Hedge_Mode или TypesPositionMode::One_way_Mode)
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки, вернет 0 если ошибок нет
-         */
-        int change_position_mode(
-                const TypesPositionMode type,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "dualSidePosition=";
-            if(type == TypesPositionMode::Hedge_Mode) query_string += "true";
-            else if(type == TypesPositionMode::One_way_Mode) query_string += "false";
-            url += "/fapi/v1/positionSide/dual?";
-            int err = post_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) {
-                /* если ошибка говорит о том, что параметр уже был установлен, как надо */
-                if(err == NO_NEED_TO_CHANGE_POSITION_SIDE) return OK;
-                return err;
+                if(stop_timestamp >= stop_date) break;
+                start_timestamp += step;
+                if(start_timestamp > stop_date) start_timestamp = stop_date;
             }
-            try {
-                json j = json::parse(response);
-                int code = j["code"];
-                if(code != 200) {
-                    return INVALID_PARAMETER;
-                }
-            } catch(...) {
-                return INVALID_PARAMETER;
-            }
-            return OK;
-        }
-
-        /** \brief Получить тип хеджирования
-         * \param position_mode Тип хеджирования (в случае успеза будет равен TypesPositionMode::Hedge_Mode или TypesPositionMode::One_way_Mode)
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки, вернет 0 если ошибок нет
-         */
-        int get_position_mode(
-                TypesPositionMode &position_mode,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v1/positionSide/dual?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if(j.find("dualSidePosition") == j.end()) {
-                    position_mode = TypesPositionMode::NONE;
-                    return DATA_NOT_AVAILABLE;
-                }
-                if(j["dualSidePosition"]) position_mode = TypesPositionMode::Hedge_Mode;
-                else position_mode = TypesPositionMode::One_way_Mode;
-            } catch(...) {
-                position_mode = TypesPositionMode::NONE;
-                return DATA_NOT_AVAILABLE;
-            }
-            return OK;
-        }
-
-        /** \brief Начать поток пользовательских данных
-         * \param listen_key Возвращаемое значение - ключ для вебсокета
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки, вернет 0 если ошибок нет
-         */
-        int start_user_data_stream(
-                std::string &listen_key,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v1/listenKey?";
-            int err = post_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if(j.find("listenKey") == j.end()) {
-                    return DATA_NOT_AVAILABLE;
-                }
-                listen_key = j["listenKey"];
-            } catch(...) {
-                return DATA_NOT_AVAILABLE;
-            }
-            return OK;
-        }
-
-        /** \brief Продлить поток пользовательских данных, чтобы предотвратить тайм-аут.
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки, вернет 0 если ошибок нет
-         */
-        int keepalive_user_data_stream(const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v1/listenKey?";
-            int err = put_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                if(response == "{}") return OK;
-            } catch(...) {
-                return DATA_NOT_AVAILABLE;
-            }
-            return OK;
-        }
-
-        /** \brief Удалить поток пользовательских данных
-         * \param recv_window Время ожидания реакции сервера
-         * \return Код ошибки, вернет 0 если ошибок нет
-         */
-        int delete_user_data_stream(const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v1/listenKey?";
-            int err = delete_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                if(response == "{}") return OK;
-            } catch(...) {
-                return DATA_NOT_AVAILABLE;
-            }
-            return OK;
-        }
-
-        int get_account_information(const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v1/account?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                std::cout << "j: " << j.dump(4) << std::endl;
-            } catch(...) {
-                return DATA_NOT_AVAILABLE;
-            }
-            return OK;
-        }
-
-        /** \brief Автоматическая отмена всех открытых ордеров
-         * \param symbol Торговый символ
-         * \param countdown_time
-         * \return Код ошибки
-         */
-        int auto_cancel_all_open_orders(
-                const std::string &symbol,
-                const uint64_t countdown_time,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            query_string += "&countdownTime=";
-            query_string += std::to_string(countdown_time);
-            url += "/fapi/v1/countdownCancelAll?";
-            int err = post_request_with_signature(response, query_string, url, recv_window, 10);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if (j["symbol"] == symbol &&
-                    j["countdownTime"] == std::to_string(countdown_time)) return OK;
-            } catch(...) {}
-            return INVALID_PARAMETER;
-        }
-
-        /** \brief Открыть маркет ордер
-         * \param symbol Торговый символ
-         * \param new_client_order_id Уникальный номер сделки
-         * \param side Направление сделки
-         * \param position_side Направление ордера
-         * \param position_mode Режим хеджирования
-         * \param quantity Размер ордера
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код ошибки
-         */
-        int open_market_order(
-                const std::string &symbol,
-                const std::string &new_client_order_id,
-                const TypesSide side,
-                const TypesPositionSide position_side,
-                const TypesPositionMode position_mode,
-                const double quantity,
-                const uint64_t recv_window = 60000,
-                std::function<void(const xtime::ftimestamp_t timestamp)> callback = nullptr) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            //const bool is_open =
-            //    ((position_side == TypesPositionSide::LONG && side == TypesSide::BUY) ||
-            //    (position_side == TypesPositionSide::SHORT && side == TypesSide::SELL)) ? true : false;
-            query_string += "symbol=";
-            query_string += symbol;
-            if(side == TypesSide::BUY) query_string += "&side=BUY";
-            else if(side == TypesSide::SELL) query_string += "&side=SELL";
-            else return INVALID_PARAMETER;
-            if(position_mode == TypesPositionMode::Hedge_Mode) {
-                if(position_side == TypesPositionSide::LONG) query_string += "&positionSide=LONG";
-                else if(position_side == TypesPositionSide::SHORT) query_string += "&positionSide=SHORT";
-                else return INVALID_PARAMETER;
-            } else if(position_mode == TypesPositionMode::One_way_Mode) {
-                query_string += "&positionSide=BOTH";
-            } else {
-                return INVALID_PARAMETER;
-            }
-            query_string += "&quantity=";
-            query_string += std::to_string(quantity);
-            query_string += "&type=MARKET";
-            if(new_client_order_id.size() > 0) {
-                query_string += "&newClientOrderId=";
-                query_string += new_client_order_id;
-            };
-            url += "/fapi/v1/order?";
-            int err = post_request_with_signature(response, query_string, url, recv_window, 10);
-            //std::cout << "response: " << response << std::endl;
-            if(err != OK) {
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                if(j["status"] == "NEW") {
-                    xtime::ftimestamp_t timestamp = (double)((uint64_t)j["updateTime"]) / 1000.0;
-                    if(callback != nullptr) callback(timestamp);
-                    return OK;
-                }
-            } catch(...) {
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        /** \brief Открыть маркет ордер
-         * \param symbol Торговый символ
-         * \param new_client_order_id Уникальный номер сделки
-         * \param order_type Тип ордера
-         * \param side Направление сделки
-         * \param position_side Направление ордера
-         * \param position_mode Режим хеджирования
-         * \param quantity Размер ордера
-         * \param stop_price Цена срабатывания
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код ошибки
-         */
-        int open_stop_market_order(
-                const std::string &symbol,
-                const std::string &new_client_order_id,
-                const TypesOrder order_type,
-                const TypesSide side,
-                const TypesPositionSide position_side,
-                const TypesPositionMode position_mode,
-                const double quantity,
-                const double stop_price,
-                const bool close_position = false,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-
-            if(position_side != TypesPositionSide::BOTH &&
-                position_mode == TypesPositionMode::One_way_Mode) return INVALID_PARAMETER;
-
-            if(side == TypesSide::SELL) {
-                query_string += "&side=SELL";
-            } else if(side == TypesSide::BUY) {
-                query_string += "&side=BUY";
-            } else return INVALID_PARAMETER;
-
-            if(position_side == TypesPositionSide::LONG) {
-                query_string += "&positionSide=LONG";
-            } else
-            if(position_side == TypesPositionSide::SHORT) {
-                query_string += "&positionSide=SHORT";
-            } else
-            if(position_side == TypesPositionSide::BOTH) {
-                query_string += "&positionSide=BOTH";
-                if(!close_position) query_string += "&reduceOnly=true";
-            } else return INVALID_PARAMETER;
-            if(!close_position) {
-                query_string += "&quantity=";
-                query_string += std::to_string(quantity);
-            }
-            query_string += "&stopPrice=";
-            query_string += std::to_string(stop_price);
-            if(order_type == TypesOrder::TAKE_PROFIT_MARKET) {
-                query_string += "&type=TAKE_PROFIT_MARKET";
-            } else if(order_type == TypesOrder::STOP_MARKET) {
-                query_string += "&type=STOP_MARKET";
-            } else return INVALID_PARAMETER;
-            query_string += "&workingType=CONTRACT_PRICE";
-            if(new_client_order_id.size() > 0) {
-                query_string += "&newClientOrderId=";
-                query_string += new_client_order_id;
-            }
-            if(close_position) {
-                query_string += "&closePosition=true";
-            } else {
-                query_string += "&closePosition=false";
-            }
-            url += "/fapi/v1/order?";
-            int err = post_request_with_signature(response, query_string, url, recv_window);
-            std::cout << "response: " << response << std::endl;
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if(j["status"] == "NEW") return OK;
-            } catch(...) {
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        /** \brief Отменить ордер
-         * \param symbol Торговый символ
-         * \param orig_client_order_id Уникальный номер сделки
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код ошибки
-         */
-        int cancel_order(
-                const std::string &symbol,
-                const std::string &orig_client_order_id,
-                const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            query_string += "&origClientOrderId=";
-            query_string += orig_client_order_id;
-            url += "/fapi/v1/order?";
-            int err = delete_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                if(j["status"] == "CANCELED") return OK;
-            } catch(...) {
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        /** \brief Отменить все открытие ордера
-         * \param symbol Торговый символ
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код ошибки
-         */
-        int cancel_all_order(
-                const std::string &symbol,
-                const uint64_t recv_window = 60000,
-                std::function<void(
-                    const bool is_open,
-                    const bool is_error,
-                    const int err_code,
-                    const std::string &response,
-                    const xtime::ftimestamp_t timestamp)> callback = nullptr) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            url += "/fapi/v1/allOpenOrders?";
-            int err = delete_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) return err;
-            try {
-                json j = json::parse(response);
-                //std::cout << j.dump(4) << std::endl;
-                if(j["code"] == 200) {
-                    return OK;
-                }
-            } catch(...) {
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        int check_order_status(
-                const std::string &symbol,
-                const std::string &orig_client_order_id,
-                const uint64_t recv_window = 60000,
-                std::function<void(
-                    const int err_code,
-                    const std::string &response,
-                    const TypesOrderStatus order_status)> callback = nullptr) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            query_string += "&origClientOrderId=";
-            query_string += orig_client_order_id;
-            url += "/fapi/v1/order?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            std::cout << "response: " << response << std::endl;
-            if(err != OK) {
-                if(callback != nullptr) callback(err, response, TypesOrderStatus::NONE);
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                /*
-                 * Order status (status):
-                 * NEW
-                 * PARTIALLY_FILLED
-                 * FILLED
-                 * CANCELED
-                 * REJECTED
-                 * EXPIRED
-                 */
-                std::string status = j["status"];
-                if(status == "NEW") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::NEW);
-                    return OK;
-                } else
-                if(status == "PARTIALLY_FILLED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::PARTIALLY_FILLED);
-                    return OK;
-                } else
-                if(status == "FILLED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::FILLED);
-                    return OK;
-                } else
-                if(status == "CANCELED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::CANCELED);
-                    return OK;
-                } else
-                if(status == "REJECTED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::REJECTED);
-                    return OK;
-                } else
-                if(status == "EXPIRED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::EXPIRED);
-                    return OK;
-                }
-            } catch(...) {
-                if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::NONE);
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        int get_open_order(
-                const std::string &symbol,
-                const std::string &orig_client_order_id,
-                const uint64_t recv_window = 60000,
-                std::function<void(
-                    const int err_code,
-                    const std::string &response,
-                    const TypesOrderStatus order_status)> callback = nullptr) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            query_string += "symbol=";
-            query_string += symbol;
-            query_string += "&origClientOrderId=";
-            query_string += orig_client_order_id;
-            url += "/fapi/v1/openOrder?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            std::cout << "response: " << response << std::endl;
-            if(err != OK) {
-                if(callback != nullptr) callback(err, response, TypesOrderStatus::NONE);
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                std::string client_order_id = j["clientOrderId"];
-                std::string status = j["status"];
-                if(status == "NEW") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::NEW);
-                    return OK;
-                } else
-                if(status == "PARTIALLY_FILLED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::PARTIALLY_FILLED);
-                    return OK;
-                } else
-                if(status == "FILLED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::FILLED);
-                    return OK;
-                } else
-                if(status == "CANCELED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::CANCELED);
-                    return OK;
-                } else
-                if(status == "REJECTED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::REJECTED);
-                    return OK;
-                } else
-                if(status == "EXPIRED") {
-                    if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::EXPIRED);
-                    return OK;
-                }
-            } catch(...) {
-                if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::NONE);
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        int get_open_orders(
-                const std::string &symbol,
-                const uint64_t recv_window = 60000,
-                std::function<void(
-                    const int err_code,
-                    const std::string &response,
-                    const TypesOrderStatus order_status)> callback = nullptr) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            if(symbol.size() != 0) {
-                query_string += "symbol=";
-                query_string += symbol;
-            }
-            url += "/fapi/v1/openOrders?";
-            const uint64_t weight = symbol.size() == 0 ? 40 : 1;
-            int err = get_request_with_signature(response, query_string, url, recv_window, weight);
-            std::cout << "response: " << response << std::endl;
-            if(err != OK) {
-                if(callback != nullptr) callback(err, response, TypesOrderStatus::NONE);
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                return OK;
-            } catch(...) {
-                if(callback != nullptr) callback(PARSER_ERROR, response, TypesOrderStatus::NONE);
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        /** \brief Получить состояния всех позиций
-         * \param symbol Символ, по которому мы получаем позицию. Если указать пустую строку, получим все позиции по всем символам.
-         * \param callback Функция обратного вызова, которая нам возвращает все позиции или ошибку
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код состояния ошибки
-         */
-        int get_position_risk(
-                const std::string &symbol,
-                std::function<void(
-                    const PositionSpec &position)> callback,
-            const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            if(symbol.size() != 0) {
-                query_string += "symbol=";
-                query_string += symbol;
-            }
-            url += "/fapi/v2/positionRisk?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) {
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                //std::cerr << j.dump(4) << std::endl;
-                for(size_t i = 0; i < j.size(); ++i) {
-                    PositionSpec position;
-                    position.symbol = j[i]["symbol"];
-                    position.position_amount = std::atof(std::string(j[i]["positionAmt"]).c_str());
-                    position.position_side = TypesPositionSide::NONE;
-                    std::string str_position_side = j[i]["positionSide"];
-                    if(str_position_side == "BOTH") position.position_side = TypesPositionSide::BOTH;
-                    else if(str_position_side == "LONG") position.position_side = TypesPositionSide::LONG;
-                    else if(str_position_side == "SHORT") position.position_side = TypesPositionSide::SHORT;
-                    callback(position);
-                    //if(position.symbol == "BTCUSDT") {
-                    //    std::cerr << j[i].dump(4) << std::endl;
-                    //}
-                }
-                return OK;
-            } catch(...) {
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
-        }
-
-        /** \brief Получить баланс
-         * \param callback Функция обратного вызова, которая нам возвращает баланс
-         * \param recv_window Время ожидания ответа, в мс.
-         * \return Код состояния ошибки
-         */
-        int get_balance(
-                std::function<void(
-                    const BalanceSpec &balance)> callback,
-            const uint64_t recv_window = 60000) {
-            std::string url(point);
-            std::string query_string;
-            std::string response;
-            url += "/fapi/v2/balance?";
-            int err = get_request_with_signature(response, query_string, url, recv_window);
-            if(err != OK) {
-                return err;
-            }
-            try {
-                json j = json::parse(response);
-                //std::cerr << j.dump(4) << std::endl;
-                for(size_t i = 0; i < j.size(); ++i) {
-                    BalanceSpec balance;
-                    balance.asset = j[i]["asset"];
-                    balance.wallet_balance = std::atof(std::string(j[i]["balance"]).c_str());
-                    balance.cross_wallet_balance = std::atof(std::string(j[i]["crossWalletBalance"]).c_str());
-                    callback(balance);
-                }
-                return OK;
-            }
-            catch(const json::parse_error& e) {
-                std::cerr << "binance_api::BinanceHttpApi.get_balance() parser error (json::parse_error), what: " << std::string(e.what()) << std::endl;
-                return PARSER_ERROR;
-            }
-            catch(const json::out_of_range& e) {
-                std::cerr << "binance_api::BinanceHttpApi.get_balance() parser error (json::out_of_range), what: " << std::string(e.what()) << std::endl;
-                return PARSER_ERROR;
-            }
-            catch(const json::type_error& e) {
-                std::cerr << "binance_api::BinanceHttpApi.get_balance() parser error (json::type_error), what: " << std::string(e.what()) << std::endl;
-                return PARSER_ERROR;
-            }
-            catch(...) {
-                std::cerr << "binance_api::BinanceHttpApi.get_balance() parser error" << std::endl;
-                return PARSER_ERROR;
-            }
-            return DATA_NOT_AVAILABLE;
+            return bars > 0 ? OK : DATA_NOT_AVAILABLE;
         }
 
         /** \brief Получить список имен символов/валютных пар
@@ -1582,7 +958,7 @@ namespace binance_api {
          * \param user_sert_file Файл сертификата
          * \param user_cookie_file Cookie файлы
          */
-        BinanceHttpApi(
+        BinanceHttpSApi(
                 const std::string &user_api_key,
                 const std::string &user_secret_key,
                 const std::string &user_sert_file = "curl-ca-bundle.crt",
@@ -1594,7 +970,7 @@ namespace binance_api {
             curl_global_init(CURL_GLOBAL_ALL);
             int err = get_exchange_info();
             if(err != OK) {
-                std::cerr << "Error: BinanceHttpApi(), get_exchange_info()" << std::endl;
+                std::cerr << "Error: BinanceHttpSApi(), get_exchange_info()" << std::endl;
             }
         };
 
@@ -1605,7 +981,7 @@ namespace binance_api {
          * \param user_sert_file Файл сертификата
          * \param user_cookie_file Cookie файлы
          */
-        BinanceHttpApi(
+        BinanceHttpSApi(
                 const std::string &user_api_key,
                 const std::string &user_secret_key,
                 const bool user_demo,
@@ -1619,7 +995,24 @@ namespace binance_api {
             curl_global_init(CURL_GLOBAL_ALL);
             int err = get_exchange_info();
             if(err != OK) {
-                std::cerr << "Error: BinanceHttpApi(), get_exchange_info()" << std::endl;
+                std::cerr << "Error: BinanceHttpSApi(), get_exchange_info()" << std::endl;
+            }
+        };
+
+        /** \brief Конструктор класса Binance Api для http запросов
+         * \param user_demo Флаг демо счета
+         * \param user_sert_file Файл сертификата
+         * \param user_cookie_file Cookie файлы
+         */
+        BinanceHttpSApi(
+                const bool user_demo,
+                const std::string &user_sert_file = "curl-ca-bundle.crt") {
+            set_demo(user_demo);
+            sert_file = user_sert_file;
+            curl_global_init(CURL_GLOBAL_ALL);
+            int err = get_exchange_info();
+            if(err != OK) {
+                std::cerr << "Error: BinanceHttpSApi(), what: get_exchange_info(), code: " << err << std::endl;
             }
         };
 
@@ -1627,18 +1020,17 @@ namespace binance_api {
          * \param user_sert_file Файл сертификата
          * \param user_cookie_file Cookie файлы
          */
-        BinanceHttpApi(
+        BinanceHttpSApi(
                 const std::string &user_sert_file = "curl-ca-bundle.crt") {
             sert_file = user_sert_file;
             curl_global_init(CURL_GLOBAL_ALL);
             int err = get_exchange_info();
             if(err != OK) {
-                std::cerr << "Error: BinanceHttpApi(), what: get_exchange_info(), code: " << err << std::endl;
+                std::cerr << "Error: BinanceHttpSApi(), what: get_exchange_info(), code: " << err << std::endl;
             }
         };
 
-        ~BinanceHttpApi() {
-        }
+        ~BinanceHttpSApi() {}
     };
 }
-#endif // BINANCE_CPP_API_HTTP_HPP_INCLUDED
+#endif // BINANCE_CPP_SAPI_HTTP_HPP_INCLUDED

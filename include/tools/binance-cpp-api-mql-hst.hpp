@@ -5,6 +5,9 @@
 #include <memory>
 
 namespace binance_api {
+
+    /** \brief Класс для записи потока котировок
+     */
     class MqlHst {
     private:
         std::string symbol; /**< Символ */
@@ -12,6 +15,7 @@ namespace binance_api {
         std::fstream file;  /**< Файл данных */
         uint32_t period = 0;
         uint32_t digits = 0;
+        int64_t timezone = 0;
         size_t offset = 0;
         xtime::timestamp_t last_timestamp = 0;
         bool is_open = false;
@@ -71,11 +75,13 @@ namespace binance_api {
             const std::string &user_symbol,
             const std::string &user_path,
             const uint32_t user_period,
-            const uint32_t user_digits) :
+            const uint32_t user_digits,
+            const int64_t user_timezone = 0) :
             symbol(user_symbol),
             path(user_path),
             period(user_period),
-            digits(user_digits) {
+            digits(user_digits),
+            timezone(user_timezone) {
             is_open = create();
         }
 
@@ -89,7 +95,7 @@ namespace binance_api {
         void update_candle(const xquotes_common::Candle &candle) {
             if(!is_open) return;
             seek(offset);
-            write_u32((uint32_t)candle.timestamp);
+            write_u32((uint32_t)((int64_t)candle.timestamp + timezone));
             write_double(candle.open);
             write_double(candle.low);
             write_double(candle.high);
@@ -107,6 +113,10 @@ namespace binance_api {
 
         inline xtime::timestamp_t get_last_timestamp() {
             return last_timestamp;
+        }
+
+        inline void set_timezone(const int64_t user_timezone) {
+            timezone = user_timezone;
         }
     };
 
